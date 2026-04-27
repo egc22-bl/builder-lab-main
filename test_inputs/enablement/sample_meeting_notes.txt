@@ -1,0 +1,9 @@
+Q3 Enablement Planning — April 2026
+
+Attendees: Sarah (PM), Dev (Eng Lead), Priya (Design)
+
+We decided to roll out the new onboarding flow to all new signups starting May 1st. The old flow will be deprecated on June 1st. Sarah owns the comms plan.
+
+We're still debating whether to gate the advanced features behind a usage threshold or a plan tier. No decision yet — Dev and Priya are running a quick experiment first.
+
+We agreed to drop the in-app tutorial video and replace it with a guided checklist. Priya will have a prototype ready by April 30th.
