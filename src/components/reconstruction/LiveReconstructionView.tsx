@@ -87,7 +87,11 @@ function DecisionCard({ d }: { d: ReconDecision }) {
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="font-mono-plex rounded border border-border px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-foreground-dim">
-              Decision {d.index}
+              {d.segment === "recovered"
+                ? "Recovered"
+                : d.segment === "consequential"
+                  ? "Consequential non-decision"
+                  : `Decision ${d.index}`}
             </span>
             {d.when && (
               <span className="font-mono-plex text-[10.5px] uppercase tracking-[0.16em] text-foreground-faint">

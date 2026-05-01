@@ -15,6 +15,8 @@ export type ResolutionStatus =
 
 export interface ReconDecision {
   index: number;
+  /** Present for outputs from the new reconstruction prompt. */
+  segment?: "decision" | "recovered" | "consequential";
   decision: string;
   when: string;
   authority: string;
@@ -148,8 +150,107 @@ function parseBulletFields(body: string): Record<string, string> {
   return out;
 }
 
-function parseDecisions(timelineBody: string): ReconDecision[] {
-  // Match "### Decision N" or plain "Decision N" (### prefix optional)
+function buildReconDecision(
+  fields: Record<string, string>,
+  index: number,
+  segment: "decision" | "recovered" | "consequential",
+): ReconDecision {
+  const resolutionRaw =
+    fields["question resolution"] ||
+    fields["question resolution status"] ||
+    "";
+  const { status, gloss } = normResolution(resolutionRaw);
+  let decisionHead = fields["decision"] || "";
+  if (segment === "recovered") {
+    decisionHead = fields["reconstructed decision"] || decisionHead;
+  } else if (segment === "consequential") {
+    decisionHead =
+      fields["question on the table"] ||
+      fields["why this is consequential"] ||
+      fields["why no commitment was made (observed)"] ||
+      "";
+  }
+  return {
+    index,
+    segment,
+    decision: decisionHead,
+    when: fields["when"] || "",
+    authority: fields["authority"] || "",
+    triggeringIssue: fields["triggering issue"] || "",
+    decisionQuestion:
+      segment === "consequential"
+        ? [fields["options considered"], fields["decision question"]].filter(Boolean).join("\n") ||
+          fields["decision question"] ||
+          ""
+        : fields["decision question"] || fields["decision question(s)"] || "",
+    resolution: status,
+    resolutionGloss: gloss,
+    observedReasoning:
+      segment === "consequential"
+        ? [fields["why no commitment was made (observed)"], fields["why this is consequential"]]
+            .filter(Boolean)
+            .join("\n\n") || fields["observed reasoning"] || ""
+        : fields["observed reasoning"] || "",
+    inferredReasoning: fields["inferred reasoning"] || "",
+    shapingConstraints: fields["shaping constraints"] || "",
+    constraintsProduced: fields["constraints produced"] || "",
+    outcomeSignals: fields["outcome signals"] || fields["outcome signals (if any)"] || "",
+    missingDetails: fields["missing operational details"] || "",
+    extractionConfidence: fields["extraction confidence"] || "",
+    fields,
+  };
+}
+
+/** Parses ### Decision N, ### Recovered decision event, and ### Consequential non-decision blocks. */
+function parseTimelineDecisionBlocks(timelineBody: string): ReconDecision[] {
+  const text = timelineBody.trim();
+  if (!text) return [];
+  if (/^\*\*No decisions reconstructed/i.test(text) || /^No decisions reconstructed/i.test(text)) {
+    return [];
+  }
+
+  const matches = [...text.matchAll(/^###\s+(.+)$/gm)] as RegExpMatchArray[];
+  const decisions: ReconDecision[] = [];
+  let recoveredSeq = 0;
+  let consequentialSeq = 0;
+
+  for (let i = 0; i < matches.length; i++) {
+    const title = matches[i][1].trim();
+    const bodyStart = matches[i].index! + matches[i][0].length;
+    const bodyEnd = i + 1 < matches.length ? matches[i + 1].index! : text.length;
+    const body = text.slice(bodyStart, bodyEnd).trim();
+
+    const decNum = title.match(/^Decision\s+(\d+)\s*$/i);
+    if (decNum) {
+      decisions.push(buildReconDecision(parseBulletFields(body), parseInt(decNum[1], 10), "decision"));
+      continue;
+    }
+    if (
+      /^Recovered decision event$/i.test(title) ||
+      /^Reconstructed decision event from non-decision artifact$/i.test(title)
+    ) {
+      recoveredSeq += 1;
+      decisions.push(buildReconDecision(parseBulletFields(body), 900 + recoveredSeq, "recovered"));
+      continue;
+    }
+    if (/^Consequential non-decision$/i.test(title)) {
+      consequentialSeq += 1;
+      decisions.push(buildReconDecision(parseBulletFields(body), 2000 + consequentialSeq, "consequential"));
+      continue;
+    }
+    if (/^Non-decision\s+context/i.test(title)) {
+      break;
+    }
+  }
+  if (decisions.length === 0 && text.length > 0) {
+    const legacy = parseLegacyTimelineDecisions(text);
+    if (legacy.length > 0) return legacy;
+  }
+  return decisions;
+}
+
+/** Legacy timeline: optional ### before Decision N; "Non-decision events" or "Non-decision context". */
+function parseLegacyTimelineDecisions(timelineBody: string): ReconDecision[] {
   const re = /^(?:###\s+)?Decision\s+(\d+)\s*$/gm;
   const matches: { idx: number; start: number; end: number }[] = [];
   let m: RegExpExecArray | null;
@@ -157,7 +258,7 @@ function parseDecisions(timelineBody: string): ReconDecision[] {
     matches.push({ idx: parseInt(m[1], 10), start: m.index, end: m.index + m[0].length });
   }
 
-  const nonDecRe = /^###\s+Non-?decision events?[^\n]*$/gim;
+  const nonDecRe = /^###\s+Non-decision\s+(?:context|events?[^\n]*)$/gim;
   let nonDecStart = -1;
   const ndm = nonDecRe.exec(timelineBody);
   if (ndm) nonDecStart = ndm.index;
@@ -168,39 +269,13 @@ function parseDecisions(timelineBody: string): ReconDecision[] {
     const nextStart = i + 1 < matches.length ? matches[i + 1].start : timelineBody.length;
     const limit = nonDecStart >= 0 && nonDecStart < nextStart ? nonDecStart : nextStart;
     const body = timelineBody.slice(start, limit).trim();
-    const fields = parseBulletFields(body);
-
-    const resolutionRaw =
-      fields["question resolution"] ||
-      fields["question resolution status"] ||
-      "";
-    const { status, gloss } = normResolution(resolutionRaw);
-
-    decisions.push({
-      index: matches[i].idx,
-      decision: fields["decision"] || "",
-      when: fields["when"] || "",
-      authority: fields["authority"] || "",
-      triggeringIssue: fields["triggering issue"] || "",
-      decisionQuestion:
-        fields["decision question"] || fields["decision question(s)"] || "",
-      resolution: status,
-      resolutionGloss: gloss,
-      observedReasoning: fields["observed reasoning"] || "",
-      inferredReasoning: fields["inferred reasoning"] || "",
-      shapingConstraints: fields["shaping constraints"] || "",
-      constraintsProduced: fields["constraints produced"] || "",
-      outcomeSignals: fields["outcome signals"] || "",
-      missingDetails: fields["missing operational details"] || "",
-      extractionConfidence: fields["extraction confidence"] || "",
-      fields,
-    });
+    decisions.push(buildReconDecision(parseBulletFields(body), matches[i].idx, "decision"));
   }
   return decisions;
 }
 
 function parseNonDecisionEvents(timelineBody: string): ReconNonDecisionEvent[] {
-  const re = /^###\s+Non-?decision events?[^\n]*$/im;
+  const re = /^###\s+Non-decision\s+(?:context|events?[^\n]*)$/im;
   const m = timelineBody.match(re);
   if (!m) return [];
   const start = m.index! + m[0].length;
@@ -424,7 +499,7 @@ export function parseReconstruction(raw: string): ParsedReconstruction {
   const header = parseHeader(raw);
 
   const timelineBody = sliceSection(raw, /^##\s+Timeline\s*$/im);
-  const decisions = parseDecisions(timelineBody);
+  const decisions = parseTimelineDecisionBlocks(timelineBody);
   const nonDecisionEvents = parseNonDecisionEvents(timelineBody);
 
   const currentBody = sliceSection(raw, /^##\s+Current state\s*$/im);
