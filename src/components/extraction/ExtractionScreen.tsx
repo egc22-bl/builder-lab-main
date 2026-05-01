@@ -6,6 +6,7 @@ import ExtractionPanel, { type QueuedFile } from "./ExtractionPanel";
 import ArtifactCard from "./ArtifactCard";
 import { parseArtifacts, type ParsedArtifact } from "@/lib/parseArtifacts";
 import { downloadAllJson, downloadAllMarkdown, downloadAllPdf } from "@/lib/artifactExports";
+import { formatSupabaseInvokeError } from "@/lib/formatSupabaseInvokeError";
 import { useArtifactStore } from "@/state/artifactStore";
 
 function readFileAsBase64(file: File): Promise<string> {
@@ -103,8 +104,16 @@ export default function ExtractionScreen() {
         },
       });
 
-      if (fnError) throw fnError;
-      if (data?.error) throw new Error(data.error);
+      if (fnError) {
+        const msg = await formatSupabaseInvokeError(fnError, data);
+        setError(msg);
+        return;
+      }
+      if (data?.error) {
+        const msg = await formatSupabaseInvokeError(null, data);
+        setError(msg);
+        return;
+      }
 
       setStep(2);
 
@@ -143,9 +152,9 @@ export default function ExtractionScreen() {
 
       // Brief pause so the operator sees "complete"
       await new Promise((r) => setTimeout(r, 350));
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Extraction failed:", e);
-      setError("Extraction failed. Check your connection and try again.");
+      setError(await formatSupabaseInvokeError(e, null));
     } finally {
       setIsProcessing(false);
       setStep(0);

@@ -69,13 +69,13 @@ export interface Reconstruction {
 
 // ── Primary reconstruction ──────────────────────────────────────────────
 
-export const fraudReconstruction: Reconstruction = {
-  id: "fraud-q3",
-  query: "Why did we change the checkout fraud rule in Q3?",
-  title: "Checkout fraud rule change — Q3",
-  pattern: "urgency → CFO gate → minor adjustment → weak outcome signal → no resolution",
+export const apiRateLimitReconstruction: Reconstruction = {
+  id: "rate-limits-q3",
+  query: "Why did we change the public API rate limits in Q3?",
+  title: "Public API rate limit change — Q3",
+  pattern: "urgency → exec gate → narrow exception → weak signal → no resolution",
   conclusion:
-    "A spike in chargebacks the week of July 8 forced an emergency tightening of the checkout fraud threshold. A proposed rollback two weeks later was blocked at the CFO review gate on chargeback-exposure grounds. The team applied a narrower rule adjustment as a temporary patch. The underlying tradeoff between fraud capture and conversion loss was never formally resolved — the topic has not surfaced in 47 days.",
+    "A spike in 429 responses and quota exhaustion the week of July 8 forced an emergency reduction of default per-key requests-per-minute. A proposed rollback to prior limits two weeks later was blocked at the VP Eng review gate on reliability grounds. The team shipped a narrower carve-out for long-contract enterprise tenants. The tradeoff between platform stability and developer velocity was never formally resolved — the topic has not surfaced in 47 days.",
   confidence: 71,
   meta: {
     strength: "Moderate",
@@ -86,54 +86,54 @@ export const fraudReconstruction: Reconstruction = {
   decisions: [
     {
       id: "d1",
-      statement: "Tighten fraud-score threshold from 0.62 to 0.74 across all checkout flows",
+      statement: "Lower default API rate limit from 1,200 to 900 RPM per key across public endpoints",
       status: "FINAL",
       type: "Constraint-driven",
       confidence: 86,
       reasoning:
-        "Chargeback rate breached the 1.2% contractual ceiling with the acquiring bank, triggering an immediate response.",
+        "Error budget for the public API tier was consumed in 48h; SRE invoked the emergency change process.",
       supportedReasoning: [
-        "Stripe radar dashboard (Jul 8) showed chargeback rate at 1.41%, above the 1.2% ceiling.",
-        "Maya Chen (Risk Lead) recommended the 0.74 threshold in #checkout-incident at 14:22 UTC.",
-        "Threshold was deployed Jul 9 09:00 UTC per Jira CHK-2841.",
+        "Grafana board (Jul 8) showed sustained 429 rate above 8% on default keys, above the 3% SLO breach threshold.",
+        "Jordan Lee (SRE Lead) recommended the 900 RPM floor in #api-incident at 14:22 UTC.",
+        "Change landed Jul 9 09:00 UTC per Jira API-2841.",
       ],
       inferredReasoning: [
-        "Speed of decision suggests the team had pre-existing alignment that 0.74 was the safe ceiling, though no prior doc references this number.",
+        "Speed of decision suggests informal agreement that 900 RPM was 'safe enough', though no capacity model was attached.",
       ],
       artifactIds: ["a1", "a2"],
     },
     {
       id: "d2",
-      statement: "Block proposed rollback to 0.65 pending CFO review",
+      statement: "Block rollback to 1,000 RPM pending VP Eng review",
       status: "CONSTRAINT",
       type: "Constraint-driven",
       confidence: 78,
       reasoning:
-        "Conversion dropped 4.1% in the two weeks following the change. A rollback was proposed but gated on chargeback-exposure grounds.",
+        "SDK adoption metrics softened after the change. A partial rollback was proposed but gated on stability review.",
       supportedReasoning: [
-        "Diego Park (Growth PM) proposed rollback in product review Jul 22.",
-        "Helena Voss (CFO) replied in #finance-leads: 'Not until we see two clean weeks under the current ceiling.'",
+        "Riley Nguyen (Developer Relations) proposed easing limits in review Jul 22.",
+        "Priya Shah (VP Eng) replied in #infra-leaders: 'Not until we see two clean weeks within error budget.'",
       ],
       inferredReasoning: [
-        "The CFO position appears to be precautionary rather than data-driven — no specific exposure model was shared.",
-        "The product team likely deprioritized further escalation given Q3 close was approaching.",
+        "VP position reads conservative — no shared forecasting doc appeared in the thread.",
+        "Likely deprioritized escalation as quarter-end freeze approached.",
       ],
       artifactIds: ["a3"],
     },
     {
       id: "d3",
-      statement: "Apply narrower rule: exempt returning customers with 6+ months tenure from tightened threshold",
+      statement: "Carve out: enterprise keys on 12+ month contracts may stay at 1,050 RPM (temporary)",
       status: "PARTIAL",
       type: "Temporary",
       confidence: 64,
       reasoning:
-        "Compromise patch shipped Aug 5 to recover some conversion loss without changing the headline threshold.",
+        "Narrow exception shipped Aug 5 to restore critical partner integrations without moving the default.",
       supportedReasoning: [
-        "PR #4418 'returning-customer fraud exemption' merged Aug 5.",
-        "Notion doc 'Fraud rule v2 — interim' authored by Diego Park, last edited Aug 4.",
+        "PR #4418 'enterprise contract RPM carve-out' merged Aug 5.",
+        "Notion doc 'Rate limits v2 — interim' authored by Riley Nguyen, last edited Aug 4.",
       ],
       inferredReasoning: [
-        "The exemption appears framed as temporary, but no sunset date or success criteria are recorded anywhere in the artifact set.",
+        "Exception is labeled temporary but no sunset date or KPI exit criteria was recorded in artifacts.",
       ],
       artifactIds: ["a4"],
     },
@@ -141,125 +141,125 @@ export const fraudReconstruction: Reconstruction = {
   open: {
     questions: [
       {
-        text: "What is the acceptable steady-state tradeoff between chargeback rate and checkout conversion?",
+        text: "What steady-state tradeoff do we want between API availability and integrator throughput?",
         tag: "Never addressed",
       },
       {
-        text: "Should the returning-customer exemption be made permanent or rolled back?",
+        text: "Should the enterprise carve-out become permanent policy?",
         tag: "Deferred",
       },
       {
-        text: "Is the 1.2% chargeback ceiling renegotiable with the acquiring bank?",
+        text: "Can we renegotiate partner commitments that assumed pre-incident limits?",
         tag: "Sidestepped",
       },
     ],
     rejected: [
       {
-        text: "Full rollback to pre-incident threshold (0.62)",
-        rationale: "Blocked at CFO gate; never re-raised.",
+        text: "Full rollback to pre-incident defaults (1,200 RPM)",
+        rationale: "Blocked at VP Eng gate; never re-proposed.",
       },
       {
-        text: "Geo-based rule (tighten only for high-risk regions)",
-        rationale: "Mentioned once by Maya Chen Jul 11; no follow-up artifacts.",
+        text: "Geo-scoped limits (tighten only noisy regions)",
+        rationale: "Mentioned once Jul 11; no follow-up artifacts.",
       },
     ],
     assumptions: [
-      { text: "0.74 threshold is the correct ceiling for sustained operation." },
-      { text: "Conversion loss attributed to fraud rule, not to concurrent checkout copy A/B test." },
-      { text: "Returning-customer cohort carries materially lower fraud risk." },
+      { text: "900 RPM is the correct sustained floor for the public tier." },
+      { text: "429 spike attributed to limit change, not concurrent deploy of batch export." },
+      { text: "Long-contract enterprise traffic is materially more predictable." },
     ],
   },
   timeline: [
     {
       date: "Jul 8",
       kind: "spike",
-      title: "Chargeback rate breaches contractual ceiling",
-      detail: "Stripe radar reports 1.41% — above the 1.2% acquirer threshold.",
+      title: "Public API error budget consumed",
+      detail: "SRE reports sustained breach of 3% 429 SLO on default keys.",
     },
     {
       date: "Jul 9",
       kind: "patch",
-      title: "Emergency threshold tightened to 0.74",
-      detail: "Deployed within 19 hours of spike. No design review.",
+      title: "Default limit reduced to 900 RPM",
+      detail: "Emergency change shipped within 19 hours; no formal design review.",
     },
     {
       date: "Jul 22",
       kind: "gate",
-      title: "CFO blocks proposed rollback",
-      detail: "Helena Voss requires 'two clean weeks' before any reduction.",
+      title: "VP Eng blocks proposed rollback",
+      detail: "Priya Shah requires two clean weeks within budget before revisiting.",
     },
     {
       date: "Aug 5",
       kind: "patch",
-      title: "Returning-customer exemption shipped",
-      detail: "Compromise patch — recovers ~1.6% of lost conversion.",
+      title: "Enterprise carve-out shipped",
+      detail: "Recovers partner SLAs; estimated ~1.6% throughput returned to affected cohort.",
     },
     {
       date: "Aug 19",
       kind: "weak-signal",
-      title: "Metrics note circulated, no response",
-      detail: "Diego Park posts week-2 numbers in #checkout. Three reactions, no replies.",
+      title: "Post-change metrics note, no decisions",
+      detail: "Riley posts week-2 SDK metrics in #api-platform. Three emoji reactions, no threaded reply.",
     },
     {
       date: "Sep 24",
       kind: "deferral",
-      title: "Topic absent from Q4 planning",
-      detail: "Fraud/conversion tradeoff not raised in Q4 OKR doc or roadmap review.",
+      title: "Topic missing from Q4 planning",
+      detail: "Stability vs throughput tradeoff not raised in Q4 OKR doc or roadmap review.",
     },
   ],
   patterns: [
     {
-      fact: "Three of the last four checkout-policy decisions were made in incident response under 24h.",
+      fact: "Three of the last four public API limit changes happened under incident response in under 24h.",
       interpretation:
-        "The team's checkout decision-making is reactive. Strategic ownership of the fraud/conversion tradeoff has not been established.",
+        "Capacity decisions are reactive. No durable owner has been named for the stability/throughput tradeoff.",
     },
     {
-      fact: "CFO has gated 4 of the last 6 fraud-related rollbacks in the past 9 months.",
+      fact: "VP Eng has gated 4 of the last 6 proposed limit increases in the past 9 months.",
       interpretation:
-        "Finance functions as a de-facto risk authority for checkout. Product authority on this surface is contested.",
+        "Engineering leadership operates as the de-facto authority on the surface; product and revenue influence is contested.",
     },
   ],
   artifacts: [
     {
       id: "a1",
       source: "Slack",
-      title: "#checkout-incident — chargeback spike thread",
+      title: "#api-incident — sustained 429 thread",
       date: "Jul 8, 14:02 UTC",
-      author: "Maya Chen",
-      authorRole: "Risk Lead",
+      author: "Jordan Lee",
+      authorRole: "SRE Lead",
       contribution: "Strong signal",
-      excerpt: "We're at 1.41 over rolling 7-day. Need to push threshold to 0.74 today.",
+      excerpt: "We're double the 429 budget on default keys. Need to land 900 RPM floor today.",
     },
     {
       id: "a2",
       source: "Jira",
-      title: "CHK-2841 — Tighten fraud threshold to 0.74",
+      title: "API-2841 — Lower default RPM to 900",
       date: "Jul 9",
-      author: "Diego Park",
-      authorRole: "Growth PM",
+      author: "Riley Nguyen",
+      authorRole: "Developer Relations",
       contribution: "Strong signal",
-      excerpt: "Deploy to all checkout flows. Owner: Risk. Review in 14 days.",
+      excerpt: "Apply all public endpoints. Owner: SRE. Review checkpoint in 14 days.",
     },
     {
       id: "a3",
       source: "Slack",
-      title: "#finance-leads — Re: rollback request",
+      title: "#infra-leaders — Re: rollback request",
       date: "Jul 22, 18:11 UTC",
-      author: "Helena Voss",
-      authorRole: "CFO",
+      author: "Priya Shah",
+      authorRole: "VP Eng",
       contribution: "Strong signal",
-      excerpt: "Not until we see two clean weeks under the current ceiling. We can revisit at month-end.",
+      excerpt: "Not until we see two clean weeks within budget. Revisit at month-end if metrics hold.",
     },
     {
       id: "a4",
       source: "Notion",
-      title: "Fraud rule v2 — interim",
+      title: "Rate limits v2 — interim",
       date: "Aug 4",
-      author: "Diego Park",
-      authorRole: "Growth PM",
+      author: "Riley Nguyen",
+      authorRole: "Developer Relations",
       contribution: "Supporting",
       excerpt:
-        "Exempt returning customers with 6+ months tenure. Targets ~30% of blocked transactions, projected to recover 1.5–2.0% conversion.",
+        "Carve-out for enterprise keys on 12+ month contracts at 1,050 RPM. Targets ~28% of affected volume; projected to recover 1.5–2.0% effective throughput.",
     },
   ],
 };
@@ -340,10 +340,17 @@ export interface HeatmapZone {
 }
 
 export const heatmapZones: HeatmapZone[] = [
-  { id: "z1", label: "Checkout / payment failures", artifacts: 47, recent: 12, recencyLevel: 4, query: "Why did we change the checkout fraud rule in Q3?" },
+  {
+    id: "z1",
+    label: "Public API reliability",
+    artifacts: 47,
+    recent: 12,
+    recencyLevel: 4,
+    query: "Why did we change the public API rate limits in Q3?",
+  },
   { id: "z2", label: "Onboarding flow changes", artifacts: 23, recent: 4, recencyLevel: 2, query: "Why did we restructure onboarding step 3?" },
   { id: "z3", label: "Q4 pricing model", artifacts: 18, recent: 8, recencyLevel: 3, query: "How did the Q4 pricing model take shape?" },
-  { id: "z4", label: "API rate limit policy", artifacts: 9, recent: 1, recencyLevel: 1, query: "Why did we revise the API rate limit policy?" },
+  { id: "z4", label: "Batch export quotas", artifacts: 9, recent: 1, recencyLevel: 1, query: "Why did we cap nightly batch export concurrency?" },
   { id: "z5", label: "Enterprise SSO requirements", artifacts: 14, recent: 3, recencyLevel: 2, query: "How did the enterprise SSO scope get decided?" },
 ];
 
@@ -355,9 +362,9 @@ export interface RecentReconstruction {
 }
 
 export const recentReconstructions: RecentReconstruction[] = [
-  { id: "fraud-q3", title: "Checkout fraud rule change — Q3", confidence: 71, drift: { state: "stable" } },
+  { id: "rate-limits-q3", title: "Public API rate limit change — Q3", confidence: 71, drift: { state: "stable" } },
   { id: "renewal-q2", title: "Renewal terms change — Q2", confidence: 74, drift: { state: "drifted", when: "3 days ago" } },
-  { id: "fraud-rollback", title: "Checkout fraud rule rollback", confidence: 88, drift: { state: "stable" } },
+  { id: "rate-limits-rollback", title: "Rate limit rollback — proposed Q2", confidence: 88, drift: { state: "stable" } },
   { id: "onboarding-step-3", title: "Onboarding step 3 restructure", confidence: 61, drift: { state: "drifted", when: "1 week ago" } },
 ];
 
@@ -374,28 +381,28 @@ export interface ThreadCandidate {
 
 export const disambiguationCandidates: ThreadCandidate[] = [
   {
-    id: "fraud-q3",
-    title: "Checkout fraud rule change — Q3",
+    id: "rate-limits-q3",
+    title: "Public API rate limit change — Q3",
     dateRange: "Jul 8 – Sep 24",
     artifacts: 34,
-    summary: "Emergency tightening following chargeback breach, contested rollback, narrow exemption patch.",
-    people: ["Maya Chen", "Diego Park", "Helena Voss"],
+    summary: "Emergency RPM reduction after SLO breach, contested rollback, temporary enterprise carve-out.",
+    people: ["Jordan Lee", "Riley Nguyen", "Priya Shah"],
   },
   {
-    id: "fraud-rollback",
-    title: "Checkout fraud rule rollback — proposed Q2",
+    id: "rate-limits-rollback",
+    title: "Rate limit rollback — proposed Q2",
     dateRange: "Apr 22 – May 10",
     artifacts: 12,
-    summary: "Q2 proposal to relax fraud thresholds; eventually superseded by Q3 emergency tightening.",
-    people: ["Diego Park", "Maya Chen"],
+    summary: "Q2 proposal to raise default limits; superseded by Q3 incident response tightening.",
+    people: ["Riley Nguyen", "Jordan Lee"],
   },
   {
-    id: "fraud-3ds",
-    title: "3DS fallback rule change — Sep",
+    id: "burst-retry-sep",
+    title: "Burst allowance + retry-after — Sep",
     dateRange: "Sep 2 – Sep 18",
     artifacts: 9,
-    summary: "Adjacent change to 3DS challenge fallback logic for EU traffic.",
-    people: ["Maya Chen", "Anders Holm"],
+    summary: "Adjacent tuning to short burst windows and Retry-After hints for saturated regions.",
+    people: ["Jordan Lee", "Anders Holm"],
   },
 ];
 
@@ -423,13 +430,13 @@ export const driftAlerts: DriftAlert[] = [
   },
   {
     id: "n3",
-    title: "Checkout fraud reconstruction has new supporting artifacts",
-    detail: "2 new Slack threads from #risk-weekly increase confidence by 4 points",
-    reconstructionId: "fraud-q3",
+    title: "API rate limit reconstruction has new supporting artifacts",
+    detail: "2 new Slack threads from #api-platform increase confidence by 4 points",
+    reconstructionId: "rate-limits-q3",
   },
 ];
 
 export const reconstructionsById: Record<string, Reconstruction> = {
-  "fraud-q3": fraudReconstruction,
+  "rate-limits-q3": apiRateLimitReconstruction,
   "onboarding-step-3": onboardingReconstruction,
 };

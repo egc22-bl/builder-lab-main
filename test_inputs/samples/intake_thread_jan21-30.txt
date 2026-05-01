@@ -1,13 +1,13 @@
 [2026-01-21 09:14 AM]
-#sales-enablement
+#customer-handoffs
 
-Tara (Head of Enablement):
+Tara (Head of Customer Education):
 We're getting a ton of inbound requests for training again. This is starting to feel unmanageable.
 
 Chris (Director of Sales):
 Yeah my team is constantly asking for new decks, refreshers, product updates. It's all over the place.
 
-Nina (Enablement Manager):
+Nina (Customer Education Lead):
 We don't have a clear intake process. Everything comes through Slack or DM.
 
 Tara:
@@ -19,8 +19,8 @@ Well the teams need support. We can't just ignore requests.
 [2026-01-21 10:02 AM]
 Email
 
-From: Tara (Head of Enablement)
-To: Nina (Enablement Manager), Jake (Program Manager), Chris (Director of Sales)
+From: Tara (Head of Customer Education)
+To: Nina (Customer Education Lead), Jake (Program Manager), Chris (Director of Sales)
 
 We need to get a handle on intake volume.
 
@@ -51,7 +51,7 @@ custom deal support
 No prioritization framework.
 
 [2026-01-22 09:06 AM]
-#sales-enablement
+#customer-handoffs
 
 Tara:
 120 requests is not sustainable.
@@ -66,24 +66,24 @@ Tara:
 So we have both volume and discoverability problems.
 
 [2026-01-22 11:42 AM]
-Meeting: Enablement Review
+Meeting: Customer education review
 
 Participants:
-Tara (Head of Enablement)
-Nina (Enablement Manager)
+Tara (Head of Customer Education)
+Nina (Customer Education Lead)
 Jake (Program Manager)
 Chris (Director of Sales)
 
 Notes:
 
-Enablement overwhelmed by inbound
+Team overwhelmed by inbound
 No clear prioritization
 Content scattered across drive + Slack
 Sales unclear what exists
 
 Options discussed:
 
-hire more enablement staff
+hire more solutions staff
 introduce intake prioritization
 reduce scope of support
 
@@ -92,7 +92,7 @@ No decision
 Agreement to explore prioritization model
 
 [2026-01-23 09:33 AM]
-#sales-enablement
+#customer-handoffs
 
 Jake:
 What if we created a scoring system for requests?
@@ -122,7 +122,7 @@ Internal doc draft
 
 Owner: Jake (Program Manager)
 
-Title: Enablement Intake Scoring Model (v1)
+Title: Request intake Scoring Model (v1)
 
 Proposed criteria:
 
@@ -140,7 +140,7 @@ what gets deprioritized
 Status: Draft
 
 [2026-01-24 10:04 AM]
-#sales-enablement
+#customer-handoffs
 
 Nina:
 This scoring model makes sense, but it's going to slow things down.
@@ -152,7 +152,7 @@ Chris:
 Sales will escalate anyway if something is urgent.
 
 [2026-01-24 03:27 PM]
-#sales-enablement
+#customer-handoffs
 
 Tara:
 We also need to rethink scope. We're supporting too many roles.
@@ -169,11 +169,11 @@ Tara:
 That's too broad.
 
 [2026-01-25 09:11 AM]
-Meeting: Enablement Scope
+Meeting: Request scope review
 
 Participants:
-Tara (Head of Enablement)
-Nina (Enablement Manager)
+Tara (Head of Customer Education)
+Nina (Customer Education Lead)
 Chris (Director of Sales)
 
 Notes:
@@ -195,7 +195,7 @@ No formal decision
 General agreement AEs are primary focus
 
 [2026-01-25 01:52 PM]
-#sales-enablement
+#customer-handoffs
 
 Tara:
 Let's try focusing on AEs and Solutions first. We can't support everyone equally.
@@ -215,7 +215,7 @@ Tara:
 We'll figure that out.
 
 [2026-01-26 09:45 AM]
-#sales-enablement
+#customer-handoffs
 
 Nina:
 We also need to fix onboarding. New reps are all over the place.
@@ -245,7 +245,7 @@ Internal doc
 
 Title: Onboarding Redesign Concept
 
-Owner: Nina (Enablement Manager)
+Owner: Nina (Customer Education Lead)
 
 Proposal:
 
@@ -262,7 +262,7 @@ measurement
 Status: Draft
 
 [2026-01-27 11:06 AM]
-#sales-enablement
+#customer-handoffs
 
 Tara:
 We can't do everything at once.
@@ -282,7 +282,7 @@ Tara:
 Yes.
 
 [2026-01-27 03:39 PM]
-#sales-enablement
+#customer-handoffs
 
 Jake:
 I'll refine scoring model and share next week.
@@ -297,12 +297,12 @@ Account: Large Enterprise Deal
 Owner: Chris (Director of Sales)
 
 Note:
-Deal requires custom enablement support
+Deal requires custom implementation support
 High urgency
-Escalated to enablement team
+Escalated to solutions team
 
 [2026-01-28 10:15 AM]
-#sales-enablement
+#customer-handoffs
 
 Chris:
 Need immediate help on this deal.
@@ -325,7 +325,7 @@ Tara:
 Yes. For now.
 
 [2026-01-29 02:07 PM]
-#sales-enablement
+#customer-handoffs
 
 Nina:
 We're still getting requests from Support.
@@ -345,11 +345,11 @@ Tara:
 Yeah. That's coming.
 
 [2026-01-30 09:30 AM]
-Meeting: Weekly Enablement Sync
+Meeting: Weekly customer education sync
 
 Participants:
-Tara (Head of Enablement)
-Nina (Enablement Manager)
+Tara (Head of Customer Education)
+Nina (Customer Education Lead)
 Jake (Program Manager)
 
 Notes:

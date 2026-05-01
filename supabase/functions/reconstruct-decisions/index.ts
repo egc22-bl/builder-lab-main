@@ -8,6 +8,16 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+/** Whitespace + accidental surrounding quotes from `secrets set "KEY=..."`. */
+function readAnthropicApiKey(): string | undefined {
+  let k = Deno.env.get("ANTHROPIC_API_KEY")?.trim();
+  if (!k) return undefined;
+  if ((k.startsWith('"') && k.endsWith('"')) || (k.startsWith("'") && k.endsWith("'"))) {
+    k = k.slice(1, -1).trim();
+  }
+  return k || undefined;
+}
+
 const SYSTEM_PROMPT = `# Decision Reconstruction Engine
 
 You are a decision reconstruction engine.
@@ -332,7 +342,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    const apiKey = readAnthropicApiKey();
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: "ANTHROPIC_API_KEY is not configured" }),
@@ -380,8 +390,15 @@ Deno.serve(async (req: Request) => {
     if (!resp.ok) {
       const errText = await resp.text();
       console.error("Anthropic error:", resp.status, errText);
+      const whereHint =
+        resp.status === 401
+          ? " Deployed functions read ANTHROPIC_API_KEY from Supabase only: Dashboard → Edge Functions → Secrets (same project as VITE_SUPABASE_URL). Root .env does not apply."
+          : "";
       return new Response(
-        JSON.stringify({ error: `Anthropic API error (${resp.status})`, detail: errText.slice(0, 600) }),
+        JSON.stringify({
+          error: `Anthropic API error (${resp.status})${whereHint}`,
+          detail: errText.slice(0, 600),
+        }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

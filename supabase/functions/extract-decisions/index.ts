@@ -8,6 +8,16 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+/** Whitespace + accidental surrounding quotes from `secrets set "KEY=..."`. */
+function readAnthropicApiKey(): string | undefined {
+  let k = Deno.env.get("ANTHROPIC_API_KEY")?.trim();
+  if (!k) return undefined;
+  if ((k.startsWith('"') && k.endsWith('"')) || (k.startsWith("'") && k.endsWith("'"))) {
+    k = k.slice(1, -1).trim();
+  }
+  return k || undefined;
+}
+
 const SYSTEM_PROMPT = `# Decision Integrity Extraction Engine
 
 You are a decision integrity extraction engine.
@@ -94,7 +104,7 @@ For each question on the table, capture:
 **Triggering issue** — the underlying problem, event, or situation that prompted the conversation. State plainly, grounded in the input. If unclear, mark \`unclear\` and note what is missing.
 
 **Decision question** — the actual choice being deliberated, framed as alternatives:
-- "roll back the fraud rule vs. adjust threshold vs. wait for more data"
+- "roll back the rate limit vs. add burst credits vs. wait for more capacity"
 - "fix onboarding step 3 now vs. defer until Q2"
 
 If the team was acting without a clearly framed question, state that. The decision question can be framed even when no commitment was reached — the question is what was on the table, regardless of whether it was answered.
@@ -271,7 +281,7 @@ Rules:
 
 ## Topic tags
 
-Assign 1–4 short topic tags (lowercase, hyphenated, specific): \`onboarding-step-3\`, \`fraud-rule\`, \`pricing-tier-2\` — not \`onboarding\` or \`pricing\`.
+Assign 1–4 short topic tags (lowercase, hyphenated, specific): \`onboarding-step-3\`, \`api-rate-limit\`, \`pricing-tier-2\` — not \`onboarding\` or \`pricing\`.
 
 ---
 
@@ -328,7 +338,7 @@ Question 1
 (Repeat for additional questions. Omit this section entirely if decision status is \`no decision content\`.)
 ### Decisions
 Decision 1
-- Decision: (what was chosen — state specifically enough that a future reader could detect a contradiction. "Adjust the threshold" is too vague; "raised fraud threshold from 0.7 to 0.85" is contradictable.)
+- Decision: (what was chosen — state specifically enough that a future reader could detect a contradiction. "Adjust the threshold" is too vague; "lowered default API RPM from 1,200 to 900" is contradictable.)
 - Evidence: "<short verbatim phrase from input>"
 - What changed:
 - Responds to: (e.g., "Question 1" — references a question from Question on the table; if the decision does not respond to any captured question, write \`none\` and explain in unresolved questions)
@@ -412,7 +422,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    const apiKey = readAnthropicApiKey();
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
@@ -482,8 +492,15 @@ Deno.serve(async (req: Request) => {
     if (!anthropicResp.ok) {
       const errText = await anthropicResp.text();
       console.error("Anthropic error:", anthropicResp.status, errText);
+      const whereHint =
+        anthropicResp.status === 401
+          ? " Deployed functions read ANTHROPIC_API_KEY from Supabase only: Dashboard → Edge Functions → Secrets (same project as VITE_SUPABASE_URL). Root .env does not apply."
+          : "";
       return new Response(
-        JSON.stringify({ error: `Anthropic API error: ${anthropicResp.status}`, detail: errText }),
+        JSON.stringify({
+          error: `Anthropic API error: ${anthropicResp.status}${whereHint}`,
+          detail: errText,
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
