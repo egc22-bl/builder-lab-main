@@ -80,12 +80,14 @@ For each input, assign a \`source_input_id\` (\`input_1\`, \`input_2\`, ...) and
 
 Assign one decision status per artifact:
 
-- **no decision content** — input is not about a decision and contains no constraints, outcome signals, or references relevant to this system. Reserved for clearly out-of-scope inputs (logistics announcements, social messages).
-- **no decision** — input is substantive but no decision was made. May still contain constraints, outcome signals, or references.
+- **no decision content** — input contains none of: an active decision question, a constraint, an outcome signal, a prior-decision reference. Reserved for inputs with no signal relevant to this system (logistics, scheduling confirmations, social messages, pure status broadcasts with no underlying problem or change).
+- **no decision** — input contains at least one of: an active decision question, a constraint, an outcome signal, or a prior-decision reference, but no commitment was made. This includes problem alerts, data requests in response to a problem, customer feedback compilations, and any input that signals or references a substantive issue without resolving it.
 - **partial decision** — a real decision was made but it is incomplete, temporary, or leaves the core question unresolved.
 - **decision** — a clear, durable decision was made.
 
 Use \`no decision\` (not \`no decision content\`) whenever the input contains a constraint, outcome signal, prior-decision reference, or active decision question — even if no commitment was made.
+
+**Default toward \`no decision\` when uncertain.** A problem alert, a data-gathering request triggered by a problem, or a feedback compilation are all \`no decision\` — they carry signal that downstream reconstruction needs to thread the story together. Reserve \`no decision content\` for inputs that genuinely carry no signal: a meeting reschedule, a thanks-for-the-update reply, a logistics announcement with no underlying issue.
 
 Visible alignment without explicit commitment is \`no decision\`. Capture the alignment direction under unresolved questions.
 
@@ -97,7 +99,7 @@ Agreement to investigate, agreement to explore, agreement to look into, and agre
 
 ## Question on the table
 
-For every artifact classified as \`no decision\`, \`partial decision\`, or \`decision\`, capture the question(s) being deliberated. This is a top-level section, not nested inside Decisions. It exists whether or not the input ended in commitment.
+When Question on the table is populated (per **When to populate vs. omit** below), capture the question(s) being deliberated. This is a top-level section, not nested inside Decisions. It exists whether or not the input ended in commitment.
 
 For each question on the table, capture:
 
@@ -123,9 +125,10 @@ A decision can be strong and still have a sidestepped or unresolved question. Th
 If multiple questions are on the table in a single artifact, list each one as Question 1, Question 2, etc. Decisions in the Decisions section reference questions by number.
 
 **When to populate vs. omit:**
-- Required for \`no decision\`, \`partial decision\`, and \`decision\` classifications.
+- Required for \`partial decision\` and \`decision\` classifications.
 - Omitted entirely for \`no decision content\`.
-- For \`no decision\`, populate when the input shows substantive deliberation — signaled by the presence of unresolved questions, rejected/unchosen options, constraints, or outcome signals tied to an unresolved condition. If none of these exist, the artifact should likely be \`no decision content\` instead.
+- For \`no decision\`, populate when the input shows substantive deliberation — signaled by the presence of unresolved questions, rejected/unchosen options, or constraints. If the artifact contains only outcome signals or only prior-decision references with no deliberation, omit Question on the table. The artifact still carries forward its outcome signals and references; it just doesn't have a question to surface.
+- Do not invent a Question on the table when none was deliberated. Writing "unclear — no deliberation present in input" as a decision question is a signal you should have omitted the section.
 
 **Distinction from Unresolved questions section:** Question on the table = what was being deliberated in this input. Unresolved questions (later section) = what remains open after this input. These overlap when nothing was resolved but are conceptually distinct.
 
@@ -335,7 +338,7 @@ Question 1
 - Decision question:
 - Question resolution status:
 - Evidence: "<short verbatim phrase from input>"
-(Repeat for additional questions. Omit this section entirely if decision status is \`no decision content\`.)
+(Repeat for additional questions. Omit this section entirely for \`no decision content\`, or for \`no decision\` when **When to populate vs. omit** above says to omit it.)
 ### Decisions
 Decision 1
 - Decision: (what was chosen — state specifically enough that a future reader could detect a contradiction. "Adjust the threshold" is too vague; "lowered default API RPM from 1,200 to 900" is contradictable.)
@@ -371,7 +374,8 @@ Decision 1
 ## Extraction QA
 - all artifacts have decision_status: yes | no
 - all artifacts have artifact_class: yes | no
-- every substantive artifact (\`no decision\`, \`partial decision\`, \`decision\`) has a populated Question on the table section: yes | no
+- every artifact with a deliberated question (\`no decision\` with unresolved questions/rejected options/constraints, \`partial decision\`, \`decision\`) has a populated Question on the table section: yes | no
+- no artifact populates Question on the table with placeholder text like "unclear — no deliberation present" (if no deliberation, the section is omitted): yes | no
 - every decision / partial decision has a non-empty Decisions section: yes | no
 - every Decision references a question from Question on the table (or explicitly states \`none\` with explanation): yes | no
 - every decision, constraint, outcome signal, and prior-decision reference has an Evidence field: yes | no
@@ -386,11 +390,11 @@ Decision 1
 - Short lines. No paragraphs.
 - If a section has no content, write \`none\`. Do not omit sections (except as noted below).
 - If decision status is \`no decision content\`, produce only the source metadata block, the decision status line, and stop. Skip all other sections.
-- If decision status is \`no decision\`, omit the Decisions section but populate Question on the table and everything else that applies.
+- If decision status is \`no decision\`, omit the Decisions section. Include Question on the table only when **When to populate vs. omit** requires it; otherwise omit that entire section. Populate everything else that applies.
 - If decision status is \`partial decision\` or \`decision\`, populate both Question on the table and Decisions sections.
 - **Never start a new artifact unless you have enough output space to complete it. If space is limited, produce fewer complete artifacts rather than more incomplete ones.** Mark \`final artifact complete: no\` in the manifest if you cannot finish.
 - Manifest: \`expected input count\` must match how many distinct inputs you segmented. \`artifact count produced\` must equal the number of \`## Artifact:\` blocks before the QA block. \`source_input_ids covered\` must list every \`input_N\` you emitted; \`source_input_ids missing\` lists gaps (or \`none\`). Set \`final artifact complete\` to \`no\` if you hit length limits or could not finish the last artifact; otherwise \`yes\`.
-- Extraction QA: Answer each line \`yes\` or \`no\` honestly based on the artifacts you actually produced. For "every decision / partial decision has a non-empty Decisions section," answer \`yes\` only if every artifact with decision status \`decision\` or \`partial decision\` includes a Decisions section with at least one fully populated decision block; for \`no decision\` / \`no decision content\`, the Decisions section must be omitted per rules above (count as satisfying the check). For "every substantive artifact has a populated Question on the table section," answer \`yes\` only if every artifact with decision status \`no decision\`, \`partial decision\`, or \`decision\` includes a Question on the table section with at least one populated question; for \`no decision content\`, the section must be omitted (count as satisfying the check). For "every decision, constraint, outcome signal, and prior-decision reference has an Evidence field," answer \`yes\` only if every populated item carries a verbatim phrase from the input. "No blank required fields" means no required bullet in the template is left empty where the section is present — use \`none\` or \`unknown\` per rules instead of blanks.
+- Extraction QA: Answer each line \`yes\` or \`no\` honestly based on the artifacts you actually produced. For "every decision / partial decision has a non-empty Decisions section," answer \`yes\` only if every artifact with decision status \`decision\` or \`partial decision\` includes a Decisions section with at least one fully populated decision block; for \`no decision\` / \`no decision content\`, the Decisions section must be omitted per rules above (count as satisfying the check). For "every artifact with a deliberated question has a populated Question on the table section," answer \`yes\` only if every artifact that classifies as \`partial decision\`, \`decision\`, or \`no decision\` with at least one of (unresolved questions, rejected/unchosen options, constraints) includes a Question on the table section with at least one populated question. For \`no decision\` artifacts containing only outcome signals or prior-decision references, the section must be omitted (count as satisfying the check). For \`no decision content\`, the section must also be omitted (count as satisfying the check). For "no artifact populates Question on the table with placeholder text like 'unclear — no deliberation present' (if no deliberation, the section is omitted)," answer \`yes\` only if no artifact uses that placeholder when the section should have been omitted per **When to populate vs. omit** above. For "every decision, constraint, outcome signal, and prior-decision reference has an Evidence field," answer \`yes\` only if every populated item carries a verbatim phrase from the input. "No blank required fields" means no required bullet in the template is left empty where the section is present — use \`none\` or \`unknown\` per rules instead of blanks.
 - Do not omit the manifest or the Extraction QA block. Do not place conversational text before the manifest or after the QA block.
 
 ---
