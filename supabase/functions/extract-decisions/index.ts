@@ -8,6 +8,16 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+/** Whitespace + accidental surrounding quotes from `secrets set "KEY=..."`. */
+function readAnthropicApiKey(): string | undefined {
+  let k = Deno.env.get("ANTHROPIC_API_KEY")?.trim();
+  if (!k) return undefined;
+  if ((k.startsWith('"') && k.endsWith('"')) || (k.startsWith("'") && k.endsWith("'"))) {
+    k = k.slice(1, -1).trim();
+  }
+  return k || undefined;
+}
+
 const SYSTEM_PROMPT = `# Decision Integrity Extraction Engine
 
 You are a decision integrity extraction engine.
@@ -70,31 +80,30 @@ For each input, assign a \`source_input_id\` (\`input_1\`, \`input_2\`, ...) and
 
 Assign one decision status per artifact:
 
-- **no decision content** — input is not about a decision and contains no constraints, outcome signals, or references relevant to this system. Reserved for clearly out-of-scope inputs (logistics announcements, social messages).
-- **no decision** — input is substantive but no decision was made. May still contain constraints, outcome signals, or references.
+- **no decision** — input contains signal (an outcome signal, a constraint, a prior-decision reference, an active decision question, or a recommendation/proposal) but no commitment was made.
 - **partial decision** — a real decision was made but it is incomplete, temporary, or leaves the core question unresolved.
 - **decision** — a clear, durable decision was made.
 
-Use \`no decision\` (not \`no decision content\`) whenever the input contains a constraint, outcome signal, prior-decision reference, or active decision question — even if no commitment was made.
+Every input the extractor receives produces a real artifact. There is no classification that filters inputs out of the system. Inputs containing no extractable signal beyond their existence (logistics confirmations, scheduling changes with no underlying issue, social messages, status broadcasts that report neither a problem nor a change) still produce an artifact — they classify as \`no decision\` and the artifact carries minimal content as specified in the trivial artifact rule below.
 
 Visible alignment without explicit commitment is \`no decision\`. Capture the alignment direction under unresolved questions.
 
 A stakeholder voicing a preference is not commitment. Commitment requires the authority to choose, and the choice to be confirmed. When meeting notes or thread outcomes explicitly state "no decision," "no formal decision," or "general agreement," that overrides any individual statement of preference within the same input — the artifact must be classified as \`no decision\` regardless of how directional the discussion was.
 
-Agreement to investigate, agreement to explore, agreement to look into, and agreement to consider are forms of alignment without commitment. They are coordination toward future work, not decisions about a course of action. The exploration itself does not constitute the substantive change required by principle 3.
+Agreement to investigate, agreement to explore, agreement to look into, and agreement to consider are forms of alignment without commitment. They are coordination toward future work, not decisions about a course of action.
 
 ---
 
 ## Question on the table
 
-For every artifact classified as \`no decision\`, \`partial decision\`, or \`decision\`, capture the question(s) being deliberated. This is a top-level section, not nested inside Decisions. It exists whether or not the input ended in commitment.
+When Question on the table is populated (per **When to populate vs. omit** below), capture the question(s) being deliberated. This is a top-level section, not nested inside Decisions. It exists whether or not the input ended in commitment.
 
 For each question on the table, capture:
 
 **Triggering issue** — the underlying problem, event, or situation that prompted the conversation. State plainly, grounded in the input. If unclear, mark \`unclear\` and note what is missing.
 
 **Decision question** — the actual choice being deliberated, framed as alternatives:
-- "roll back the fraud rule vs. adjust threshold vs. wait for more data"
+- "roll back the rate limit vs. add burst credits vs. wait for more capacity"
 - "fix onboarding step 3 now vs. defer until Q2"
 
 If the team was acting without a clearly framed question, state that. The decision question can be framed even when no commitment was reached — the question is what was on the table, regardless of whether it was answered.
@@ -113,9 +122,18 @@ A decision can be strong and still have a sidestepped or unresolved question. Th
 If multiple questions are on the table in a single artifact, list each one as Question 1, Question 2, etc. Decisions in the Decisions section reference questions by number.
 
 **When to populate vs. omit:**
-- Required for \`no decision\`, \`partial decision\`, and \`decision\` classifications.
-- Omitted entirely for \`no decision content\`.
-- For \`no decision\`, populate when the input shows substantive deliberation — signaled by the presence of unresolved questions, rejected/unchosen options, constraints, or outcome signals tied to an unresolved condition. If none of these exist, the artifact should likely be \`no decision content\` instead.
+
+Populate Question on the table ONLY when the input contains explicit framing of alternatives. Explicit framing means one of:
+
+- Someone in the input literally asks a question that names alternatives or implies a choice (e.g., "should we revert this or adjust the threshold?", "do we go with option A or option B?").
+- The input's dialog or text shows participants weighing named alternatives against each other (e.g., one person argues for X, another argues for Y, a third synthesizes or chooses).
+- The input is a document or summary that explicitly states a question being decided (e.g., "Decision required: gate features or maintain access").
+
+If none of these patterns are present in the input text, omit Question on the table. This applies to every artifact class. A \`decision\` artifact whose source input shows the action taken without showing the deliberation that produced it will have its Decisions section populated and Question on the table omitted.
+
+Do not infer a question from context. Do not reconstruct what the question must have been. If the input does not literally show the framing, the question was not on the table in this input — it may have been on the table in an earlier artifact, which reconstruction will surface.
+
+Do not write a Question on the table populated with hedge language, qualifiers, or admissions that no question is present. If the section is being populated with text such as "unclear," "no deliberation," "not visible," "not captured," or any phrasing that hedges the existence of a question, the correct fix is to omit the section entirely.
 
 **Distinction from Unresolved questions section:** Question on the table = what was being deliberated in this input. Unresolved questions (later section) = what remains open after this input. These overlap when nothing was resolved but are conceptually distinct.
 
@@ -218,7 +236,7 @@ Outcome signals are evidence, not decisions. Do not classify them as new decisio
 ## References to prior decisions
 
 If the input references a decision made earlier (a policy in place, a change already made, a plan previously agreed), capture:
-- topic or subject of the prior decision, in the input's own terms
+- topic of the prior decision, expressed as a short hyphenated tag matching the topic_tags vocabulary (e.g., \`onboarding-step-3\`, \`pricing-tier-2\`, \`feature-gating\`). If the input refers to the prior decision by a different label, use the tag form anyway. The goal is consistency across artifacts so downstream chain assembly can match references to topics deterministically.
 - current state in this input: \`still in effect\` | \`being revisited\` | \`being reversed\` | \`degraded\` | \`unclear\`
 - whether the current input proposes to change it
 - Evidence: short verbatim phrase from the input
@@ -271,20 +289,33 @@ Rules:
 
 ## Topic tags
 
-Assign 1–4 short topic tags (lowercase, hyphenated, specific): \`onboarding-step-3\`, \`fraud-rule\`, \`pricing-tier-2\` — not \`onboarding\` or \`pricing\`.
+Assign 1–4 short topic tags (lowercase, hyphenated, specific): \`onboarding-step-3\`, \`api-rate-limit\`, \`pricing-tier-2\` — not \`onboarding\` or \`pricing\`.
 
 ---
 
 ## Artifact class
 
 Derived from what is populated, in order:
-1. If decision status is \`no decision content\` → \`noise\`
-2. Else if any decision is present → \`decision\`
-3. Else if any constraint is present → \`constraint\`
-4. Else if any outcome signal is present → \`outcome\`
-5. Else if only references to prior decisions are present → \`reference\`
+
+1. If any decision is present → \`decision\`
+2. Else if any constraint is present → \`constraint\`
+3. Else if any outcome signal is present → \`outcome\`
+4. Else if any prior-decision reference is present → \`reference\`
+5. Else → \`trivial\`
 
 Do not override based on judgment. The class is whatever the populated fields produce.
+
+**Trivial artifact rule.** When an input contains no extractable signal beyond its existence — no decision, no constraint, no outcome signal, no prior-decision reference, no active question — it produces a \`trivial\` artifact. A trivial artifact has only three populated sections:
+
+- Source metadata (standard fields)
+- Decision status (\`no decision\`)
+- Trivial input summary
+
+The Trivial input summary contains exactly one verbatim phrase from the input, in quotation marks, with no additional prose, description, or interpretation. The phrase should be the most representative line from the input — a phrase that, on its own, conveys what the input was about. Use ellipses for omitted middle text within the quoted phrase if needed.
+
+A trivial artifact omits all other sections (Question on the table, Decisions, Constraints, Outcome signals, References to prior decisions, Rejected or unchosen options, Unresolved questions, Decision dynamics).
+
+The purpose of the trivial artifact is audit-ability: every input the system received must produce a traceable artifact, even when the input contains no extractable signal beyond its existence.
 
 ---
 
@@ -312,23 +343,27 @@ Use a line with exactly \`===\` (and nothing else on that line) between manifest
 ### Source metadata
 - artifact_id: (e.g., artifact_2024-10-14_pricing-01)
 - source_input_id: input_N
-- artifact_class: (derived)
+- artifact_class: (derived: decision | constraint | outcome | reference | trivial)
 - source type: (slack | meeting | doc | email | ticket | screenshot | unknown)
 - date or time window: (or "unknown")
 - participants: (name — role, or "unknown role")
 - topic tags: (1–4)
 ### Decision status
-(one value)
+(one of: no decision, partial decision, decision)
+### Trivial input summary
+(Populated only when artifact_class is \`trivial\`. Contains exactly one verbatim phrase from the input in quotation marks, no other prose. Omit this section entirely for any artifact_class other than \`trivial\`.)
 ### Question on the table
+(Populated only when the input contains explicit framing of alternatives — a literal question naming options, dialog weighing named alternatives, or a document stating a question being decided. Omit this section entirely if no such framing is present in the input, regardless of artifact_class.)
 Question 1
 - Triggering issue:
 - Decision question:
 - Question resolution status:
 - Evidence: "<short verbatim phrase from input>"
-(Repeat for additional questions. Omit this section entirely if decision status is \`no decision content\`.)
+(If multiple questions are on the table in a single artifact, list each one as Question 1, Question 2, etc. Decisions in the Decisions section reference questions by number.)
+(Omit this section entirely if no explicit framing of alternatives is present in the input text, per **When to populate vs. omit** above.)
 ### Decisions
 Decision 1
-- Decision: (what was chosen — state specifically enough that a future reader could detect a contradiction. "Adjust the threshold" is too vague; "raised fraud threshold from 0.7 to 0.85" is contradictable.)
+- Decision: (what was chosen — state specifically enough that a future reader could detect a contradiction. "Adjust the threshold" is too vague; "lowered default API RPM from 1,200 to 900" is contradictable.)
 - Evidence: "<short verbatim phrase from input>"
 - What changed:
 - Responds to: (e.g., "Question 1" — references a question from Question on the table; if the decision does not respond to any captured question, write \`none\` and explain in unresolved questions)
@@ -338,7 +373,7 @@ Decision 1
 - Decision strength:
 - Authority: (who decided; role; whether contested)
 - Produces: (constraint created by this decision, if any; else "none")
-(Repeat for additional decisions. Omit this section entirely if decision status is \`no decision\` or \`no decision content\`.)
+(Repeat for additional decisions. Omit this section entirely if decision status is \`no decision\`, artifact_class is \`trivial\`, or there are no decisions to record.)
 ### Constraints
 - (constraint — explicit/inferred — source — origin — Evidence: "<short verbatim phrase>")
 ### Outcome signals
@@ -359,12 +394,14 @@ Decision 1
 - reversal or degradation: (none | reversal | degradation — short note)
 ===
 ## Extraction QA
-- all artifacts have decision_status: yes | no
-- all artifacts have artifact_class: yes | no
-- every substantive artifact (\`no decision\`, \`partial decision\`, \`decision\`) has a populated Question on the table section: yes | no
-- every decision / partial decision has a non-empty Decisions section: yes | no
-- every Decision references a question from Question on the table (or explicitly states \`none\` with explanation): yes | no
+- all artifacts have decision_status (one of: no decision, partial decision, decision): yes | no
+- all artifacts have artifact_class (one of: decision, constraint, outcome, reference, trivial): yes | no
+- every \`decision\` and \`partial decision\` artifact has a non-empty Decisions section: yes | no
+- every \`trivial\` artifact contains only source metadata, decision status, and Trivial input summary (no other sections present): yes | no
+- every populated Question on the table section corresponds to explicit framing of alternatives in the source input (no inferred or reconstructed questions): yes | no
+- no artifact populates Question on the table with hedge language (any of: "unclear", "not clear", "no deliberation", "not deliberated", "no decision question", "not visible", "not captured", "no specific question", or similar phrasing): yes | no
 - every decision, constraint, outcome signal, and prior-decision reference has an Evidence field: yes | no
+- every prior-decision reference Topic field uses the hyphenated tag form (matching topic_tags vocabulary), not prose: yes | no
 - no artifact ends mid-section: yes | no
 - no blank required fields: yes | no
 \`\`\`
@@ -375,12 +412,12 @@ Decision 1
 
 - Short lines. No paragraphs.
 - If a section has no content, write \`none\`. Do not omit sections (except as noted below).
-- If decision status is \`no decision content\`, produce only the source metadata block, the decision status line, and stop. Skip all other sections.
-- If decision status is \`no decision\`, omit the Decisions section but populate Question on the table and everything else that applies.
-- If decision status is \`partial decision\` or \`decision\`, populate both Question on the table and Decisions sections.
+- If artifact_class is \`trivial\`, produce only the source metadata block, the decision status line (\`no decision\`), and the Trivial input summary section. Skip all other sections including Question on the table.
+- If decision status is \`no decision\` but the artifact contains at least one populated signal (constraint, outcome signal, prior-decision reference) and therefore is NOT trivial, populate all sections that apply per the standard rules. Question on the table is populated only when the input shows explicit framing of alternatives per **When to populate vs. omit** above.
+- If decision status is \`partial decision\` or \`decision\`, populate the Decisions section. Populate Question on the table only if the input shows explicit framing of alternatives in the dialog or text. A \`decision\` artifact whose source input shows the action without the deliberation has Decisions populated and Question on the table omitted.
 - **Never start a new artifact unless you have enough output space to complete it. If space is limited, produce fewer complete artifacts rather than more incomplete ones.** Mark \`final artifact complete: no\` in the manifest if you cannot finish.
 - Manifest: \`expected input count\` must match how many distinct inputs you segmented. \`artifact count produced\` must equal the number of \`## Artifact:\` blocks before the QA block. \`source_input_ids covered\` must list every \`input_N\` you emitted; \`source_input_ids missing\` lists gaps (or \`none\`). Set \`final artifact complete\` to \`no\` if you hit length limits or could not finish the last artifact; otherwise \`yes\`.
-- Extraction QA: Answer each line \`yes\` or \`no\` honestly based on the artifacts you actually produced. For "every decision / partial decision has a non-empty Decisions section," answer \`yes\` only if every artifact with decision status \`decision\` or \`partial decision\` includes a Decisions section with at least one fully populated decision block; for \`no decision\` / \`no decision content\`, the Decisions section must be omitted per rules above (count as satisfying the check). For "every substantive artifact has a populated Question on the table section," answer \`yes\` only if every artifact with decision status \`no decision\`, \`partial decision\`, or \`decision\` includes a Question on the table section with at least one populated question; for \`no decision content\`, the section must be omitted (count as satisfying the check). For "every decision, constraint, outcome signal, and prior-decision reference has an Evidence field," answer \`yes\` only if every populated item carries a verbatim phrase from the input. "No blank required fields" means no required bullet in the template is left empty where the section is present — use \`none\` or \`unknown\` per rules instead of blanks.
+- Extraction QA: Answer each line \`yes\` or \`no\` honestly based on the artifacts you actually produced. For "every \`decision\` and \`partial decision\` artifact has a non-empty Decisions section," answer \`yes\` only if every artifact with those statuses includes a Decisions section with at least one fully populated decision block. For "every \`trivial\` artifact contains only source metadata, decision status, and Trivial input summary," answer \`yes\` only if no \`trivial\` artifact has any other section populated. A \`trivial\` artifact with even one extracted signal (constraint, outcome signal, etc.) is misclassified — its artifact_class should be derived from that signal per the standard rules. For "every populated Question on the table section corresponds to explicit framing of alternatives," answer \`yes\` only if every Question on the table you populated can be traced to a literal question, named alternatives, or stated decision question in the source input. If you populated Question on the table based on inferred deliberation rather than explicit framing, the section should have been omitted. For "no artifact populates Question on the table with hedge language," answer \`yes\` only if no Question on the table section in any artifact contains the prohibited phrases listed in the Question on the table rule. If you find such a phrase in your output, the correct fix is to omit the Question on the table section for that artifact entirely. For "every Decision references a question from Question on the table (or explicitly states \`none\` with explanation)," answer \`yes\` only if each decision row satisfies that rule. For "every decision, constraint, outcome signal, and prior-decision reference has an Evidence field," answer \`yes\` only if every populated item carries a verbatim phrase from the input. For "every prior-decision reference Topic field uses the hyphenated tag form (matching topic_tags vocabulary), not prose," answer \`yes\` only if every Topic field is a short hyphenated tag, not free-form prose. "No blank required fields" means no required bullet in the template is left empty where the section is present — use \`none\` or \`unknown\` per rules instead of blanks.
 - Do not omit the manifest or the Extraction QA block. Do not place conversational text before the manifest or after the QA block.
 
 ---
@@ -412,7 +449,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    const apiKey = readAnthropicApiKey();
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
@@ -482,8 +519,15 @@ Deno.serve(async (req: Request) => {
     if (!anthropicResp.ok) {
       const errText = await anthropicResp.text();
       console.error("Anthropic error:", anthropicResp.status, errText);
+      const whereHint =
+        anthropicResp.status === 401
+          ? " Deployed functions read ANTHROPIC_API_KEY from Supabase only: Dashboard → Edge Functions → Secrets (same project as VITE_SUPABASE_URL). Root .env does not apply."
+          : "";
       return new Response(
-        JSON.stringify({ error: `Anthropic API error: ${anthropicResp.status}`, detail: errText }),
+        JSON.stringify({
+          error: `Anthropic API error: ${anthropicResp.status}${whereHint}`,
+          detail: errText,
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

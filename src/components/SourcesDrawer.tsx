@@ -7,6 +7,7 @@ import ArtifactCard from "@/components/extraction/ArtifactCard";
 import { parseArtifacts } from "@/lib/parseArtifacts";
 import { useArtifactStore } from "@/state/artifactStore";
 import { downloadAllJson, downloadAllMarkdown, downloadAllPdf } from "@/lib/artifactExports";
+import { formatSupabaseInvokeError } from "@/lib/formatSupabaseInvokeError";
 
 function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -84,8 +85,16 @@ export default function SourcesDrawer({ open, onClose }: Props) {
           },
         },
       });
-      if (fnError) throw fnError;
-      if (data?.error) throw new Error(data.error);
+      if (fnError) {
+        const msg = await formatSupabaseInvokeError(fnError, data);
+        toast.error(msg);
+        return;
+      }
+      if (data?.error) {
+        const msg = await formatSupabaseInvokeError(null, data);
+        toast.error(msg);
+        return;
+      }
       setStep(2);
 
       const text: string = data?.text || "";
@@ -112,7 +121,8 @@ export default function SourcesDrawer({ open, onClose }: Props) {
       await new Promise((r) => setTimeout(r, 250));
     } catch (e) {
       console.error("Extraction failed:", e);
-      toast.error("Extraction failed. Try again.");
+      const msg = await formatSupabaseInvokeError(e, null);
+      toast.error(msg);
     } finally {
       setIsProcessing(false);
       setStep(0);

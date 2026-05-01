@@ -3,7 +3,7 @@
  *
  * Usage:
  *   bun run_regression.ts                                    # run all scenarios
- *   bun run_regression.ts --scenario enablement              # one scenario
+ *   bun run_regression.ts --scenario samples               # one scenario
  *   bun run_regression.ts --url https://...                  # override endpoint
  *
  * Batching (for large inputs that exceed the output token limit):

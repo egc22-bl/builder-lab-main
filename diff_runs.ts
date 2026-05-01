@@ -39,7 +39,7 @@ async function readArtifacts(filePath: string): Promise<any[]> {
   return Array.isArray(parsed) ? parsed : [parsed];
 }
 
-/** Returns all .json paths under dir as relative paths (e.g. "enablement/foo.txt.json") */
+/** Returns all .json paths under dir as relative paths (e.g. "samples/foo.txt.json") */
 async function collectJsonFiles(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });
   const results: string[] = [];
