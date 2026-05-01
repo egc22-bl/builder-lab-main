@@ -2,3 +2,6 @@ project_id = "echxjpwuyasgldyiemhh"
 
 [functions.extract-decisions]
 verify_jwt = false
+
+[functions.reconstruct-decisions]
+verify_jwt = false
